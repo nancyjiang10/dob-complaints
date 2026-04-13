@@ -4,6 +4,7 @@ const START_YEAR = 2020;
 const START_MONTH_INDEX = 0; // January
 const START_DAY = 1;
 const START_DATE = new Date(START_YEAR, START_MONTH_INDEX, START_DAY);
+const API_TIMEOUT_MS = 15000;
 
 // Complaint category code to description mapping
 const COMPLAINT_CATEGORIES = {
@@ -231,7 +232,17 @@ export async function fetchComplaints() {
       $order: 'date_entered DESC',
     });
 
-    const response = await fetch(`${API_URL}?${params}`);
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), API_TIMEOUT_MS);
+    let response;
+    try {
+      response = await fetch(`${API_URL}?${params}`, {
+        signal: controller.signal,
+      });
+    } finally {
+      clearTimeout(timeoutId);
+    }
+
     if (!response.ok) {
       throw new Error(`API Error: ${response.status}`);
     }

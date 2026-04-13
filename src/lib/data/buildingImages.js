@@ -22,6 +22,7 @@ const ADDRESS_STOP_WORDS = new Set([
 
 const geocodeCache = new Map();
 const imageCache = new Map();
+const REQUEST_TIMEOUT_MS = 8000;
 
 const STOCK_IMAGE_POOL = [
   {
@@ -84,6 +85,20 @@ const STOCK_IMAGE_POOL = [
 
 function stripHtml(value = '') {
   return String(value).replace(/<[^>]*>/g, '').replace(/\s+/g, ' ').trim();
+}
+
+async function fetchWithTimeout(url, options = {}, timeoutMs = REQUEST_TIMEOUT_MS) {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+
+  try {
+    return await fetch(url, {
+      ...options,
+      signal: controller.signal,
+    });
+  } finally {
+    clearTimeout(timeoutId);
+  }
 }
 
 function dedupe(values) {
@@ -259,11 +274,17 @@ async function geocodeAddress(address) {
 
   const query = `${address}, New York, NY`;
   const url = `https://nominatim.openstreetmap.org/search?format=jsonv2&limit=1&q=${encodeURIComponent(query)}`;
-  const response = await fetch(url, {
-    headers: {
-      'User-Agent': 'dob-complaints/1.0 (open-licensed building images)',
-    },
-  });
+  let response;
+  try {
+    response = await fetchWithTimeout(url, {
+      headers: {
+        'User-Agent': 'dob-complaints/1.0 (open-licensed building images)',
+      },
+    });
+  } catch {
+    geocodeCache.set(address, null);
+    return null;
+  }
 
   if (!response.ok) {
     geocodeCache.set(address, null);
@@ -279,7 +300,12 @@ async function geocodeAddress(address) {
 async function fetchOpenverseImage(address, searchTerms, locationParts = []) {
   for (const term of searchTerms) {
     const url = `https://api.openverse.engineering/v1/images/?q=${encodeURIComponent(term)}&license_type=all&source_facet=wikimedia+commons,flickr`;
-    const response = await fetch(url);
+    let response;
+    try {
+      response = await fetchWithTimeout(url);
+    } catch {
+      continue;
+    }
 
     if (!response.ok) {
       continue;
@@ -304,7 +330,12 @@ async function fetchCommonsImage(address, geocode) {
   }
 
   const query = `https://commons.wikimedia.org/w/api.php?action=query&generator=geosearch&ggscoord=${encodeURIComponent(`${geocode.lat}|${geocode.lon}`)}&ggsradius=2000&ggslimit=10&prop=imageinfo&iiprop=url|extmetadata&iiurlwidth=900&format=json&origin=*`;
-  const response = await fetch(query);
+  let response;
+  try {
+    response = await fetchWithTimeout(query);
+  } catch {
+    return null;
+  }
 
   if (!response.ok) {
     return null;
