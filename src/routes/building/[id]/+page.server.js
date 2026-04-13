@@ -4,8 +4,18 @@ import { error } from '@sveltejs/kit';
 
 export const prerender = true;
 
+let buildingsPromise;
+
+function getBuildings() {
+  if (!buildingsPromise) {
+    buildingsPromise = fetchComplaints();
+  }
+
+  return buildingsPromise;
+}
+
 export async function load({ params }) {
-  const buildings = await fetchComplaints();
+  const buildings = await getBuildings();
   const building = buildings.find((b) => b.id === params.id);
 
   if (!building) {
@@ -18,6 +28,6 @@ export async function load({ params }) {
 }
 
 export async function entries() {
-  const buildings = await fetchComplaints();
+  const buildings = await getBuildings();
   return buildings.map((b) => ({ id: b.id }));
 }
