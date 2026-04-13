@@ -5,6 +5,7 @@ const START_MONTH_INDEX = 0; // January
 const START_DAY = 1;
 const START_DATE = new Date(START_YEAR, START_MONTH_INDEX, START_DAY);
 const API_TIMEOUT_MS = 15000;
+let complaintsPromise;
 
 // Complaint category code to description mapping
 const COMPLAINT_CATEGORIES = {
@@ -224,6 +225,11 @@ export function getCategoryPriority(code) {
  * Fetches all records (using pagination if necessary) and aggregates by address
  */
 export async function fetchComplaints() {
+  if (complaintsPromise) {
+    return complaintsPromise;
+  }
+
+  complaintsPromise = (async () => {
   try {
     // Fetch with a limit to get substantial data
     // The API supports $limit for pagination
@@ -262,8 +268,12 @@ export async function fetchComplaints() {
     return buildings.sort((a, b) => b.violationCount - a.violationCount);
   } catch (error) {
     console.error('Error fetching complaints:', error);
+    complaintsPromise = null;
     return [];
   }
+  })();
+
+  return complaintsPromise;
 }
 
 /**
