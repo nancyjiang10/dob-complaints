@@ -22,7 +22,8 @@ export async function load({ params }) {
     throw error(404, 'Building not found');
   }
 
-  const [enrichedBuilding] = await enrichBuildingsWithImages([building], 1);
+  // Use the non-network stock fallback for detail-page prerender speed.
+  const [enrichedBuilding] = await enrichBuildingsWithImages([building], 0);
 
   return { building: enrichedBuilding };
 }
